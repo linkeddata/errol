@@ -28,8 +28,6 @@ function get_inbox($url){
   try{
     $graph->parse($data, $ct, $url);
   } catch (Exception $e) {
-    var_dump($data);
-    var_dump($e);
     return $e->getMessage();
   }
   
@@ -81,6 +79,9 @@ function make_notification_as($post){
     $graph->add($notif, 'as:actor', $graph->resource($post['actor']));
   }
   
+  $date = EasyRdf_Literal::create(date(DATE_ATOM), null, 'xsd:dateTime');
+  $graph->add($notif, 'as:published', $date);
+  
   $normed = $graph->serialise('turtle');
   return $normed;
 }
@@ -90,13 +91,41 @@ function make_notification_pingback($post){
   $graph = new EasyRdf_Graph();
   EasyRdf_Namespace::set('pingback', 'http://purl.org/net/pingback/');
   
-  $notif = $graph->resource(' ', 'solid:Notification');
+  $notif = $graph->resource('placeholder', 'solid:Notification');
   $graph->add($notif, 'rdf:type', $graph->resource('pingback:Request'));
   $graph->add($notif, 'pingback:source', $graph->resource($post['source']));
   $graph->add($notif, 'pingback:target', $graph->resource($post['object']));
   
+  $date = EasyRdf_Literal::create(date(DATE_ATOM), null, 'xsd:dateTime');
+  $graph->add($notif, 'dct:created', $date);
+  
   $normed = $graph->serialise('turtle');
   return $normed;
+}
+
+function make_notification_sioc($post){
+  
+  $graph = new EasyRdf_Graph();
+  EasyRdf_Namespace::set('sioc', 'http://rdfs.org/sioc/ns#');
+  EasyRdf_Namespace::set('dct', 'http://purl.org/dc/terms/');
+  
+  $notif = $graph->resource('placeholder', 'solid:Notification');
+  $graph->add($notif, 'rdf:type', $graph->resource('sioc:Post'));
+  if($post['title'] != ""){
+    $graph->addLiteral($notif, 'sioc:title', $post['title']);
+  }
+  if($post['content'] != ""){
+    $graph->addLiteral($notif, 'sioc:content', $post['content']);
+  }
+  if($post['creator'] != ""){
+    $graph->add($notif, 'dct:creator', $graph->resource($post['creator']));
+  }
+  $date = EasyRdf_Literal::create(date(DATE_ATOM), null, 'xsd:dateTime');
+  $graph->add($notif, 'dct:created', $date);
+  
+  $normed = $graph->serialise('turtle');
+  return $normed;
+  
 }
 
 function write_notification($inbox, $turtle){
@@ -116,7 +145,7 @@ function write_notification($inbox, $turtle){
   return $result;
 }
 
-if(isset($_POST)){
+if(isset($_POST) && count($_POST) > 0){
   $errors = array();
   
   if(isset($_POST['sendAs'])){
@@ -125,7 +154,7 @@ if(isset($_POST)){
       $errors['to'] = "Must include one or more of to or in reply to or about.";
     }
     if($_POST['source'] == "" && $_POST['content'] == ""){
-      $errors['source'] = "Must include source and/or content";
+      $errors['source'] = "Must include source and/or content.";
     }
     if(count($errors) < 1){
       $notification = make_notification_as($_POST);
@@ -134,10 +163,23 @@ if(isset($_POST)){
   }elseif(isset($_POST['sendPingback'])){
     
     if($_POST['source'] == "" || $_POST['object'] == ""){
-      $errors['pingback'] = "Must include source and target";
+      $errors['pingback'] = "Must include source and target.";
     }
     if(count($errors) < 1){
       $notification = make_notification_pingback($_POST);
+    }
+    
+  }elseif(isset($_POST['sendSioc'])){
+    
+    if($_POST['to'] == ""){
+      $errors['to'] = "Must include to.";
+    }
+    
+    if($_POST['title'] == "" && $_POST['content'] == ""){
+      $errors['sioc'] = "Must include title or content.";
+    }
+    if(count($errors) < 1){
+      $notification = make_notification_sioc($_POST);
     }
     
   }
@@ -220,6 +262,7 @@ if(isset($_POST)){
       <ul>
         <li><a href="#formAs" id="linkAs">ActivityStreams2</a></li>
         <li><a href="#formPingback" id="linkPingback">Pingback</a></li>
+        <li><a href="#formSioc" id="linkSioc">Sioc</a></li>
       </ul>
     </nav>
     <form method="post" id="formAs">
@@ -237,6 +280,7 @@ if(isset($_POST)){
       <p><label>Your URI</label> <input name="actor" type="url" value="<?=isset($_POST['actor']) ? $_POST['actor'] : ''?>" /></p>
       <p><input type="submit" id="sendAs" name="sendAs" value="Send" /></p>
     </form>
+    
     <form method="post" id="formPingback">
       <h2>Pingback</h2>
       <p><em>Source</em> and <em>target</em> are required.</p>
@@ -245,25 +289,65 @@ if(isset($_POST)){
         <p><label>Target</label> <input name="object" type="url" placeholder="Where this notification is pointing to" value="<?=isset($_POST['object']) ? $_POST['object'] : ''?>" /></p>
         <p><input type="submit" id="sendPingback" name="sendPingback" value="Send" /></p>
     </form>
+    
+    <form method="post" id="formSioc">
+      <h2>Sioc</h2>
+      <p><em>To</em> is required and one of <em>title</em> and <em>content</em> is required.</p>
+      <?=isset($errors['to']) ? '<div class="error"><p>'.$errors['to'].'</p>' : ""?>
+        <p><label>To</label> <input name="to" type="url" placeholder="WebID of receiver" value="<?=isset($_POST['to']) ? $_POST['to'] : ''?>" /></p>
+      <?=isset($errors['to']) ? '</div>' : ""?>
+      <p><label>From</label> <input name="creator" type="url" placeholder="WebID of author of message" value="<?=isset($_POST['creator']) ? $_POST['creator'] : ''?>" /></p>
+      <?=isset($errors['sioc']) ? '<div class="error"><p>'.$errors['sioc'].'</p>' : ""?>
+        <p><label>Title</label> <input name="title" type="text" placeholder="Name for this message" value="<?=isset($_POST['title']) ? $_POST['title'] : ''?>" /></p>
+        <p><label>Content</label> <textarea name="content"><?=isset($_POST['content']) ? $_POST['content'] : ''?></textarea></p>
+      <?=isset($errors['sioc']) ? '</div>' : ""?>
+        <p><input type="submit" id="sendSioc" name="sendSioc" value="Send" /></p>
+    </form>
+    
     <script>
       if(window.location.hash == "#formPingback"){
         document.getElementById('formAs').style.display = 'none';
+        document.getElementById('formSioc').style.display = 'none';
         document.getElementById('linkPingback').style.backgroundColor = 'silver';
+      }else if(window.location.hash == "#formSioc"){
+        document.getElementById('formAs').style.display = 'none';
+        document.getElementById('formPingback').style.display = 'none';
+        document.getElementById('linkSioc').style.backgroundColor = 'silver';
       }else{
         document.getElementById('formPingback').style.display = 'none';
+        document.getElementById('formSioc').style.display = 'none';
         document.getElementById('linkAs').style.backgroundColor = 'silver';
       }
       document.getElementById('linkPingback').addEventListener('click', function(){
         this.style.backgroundColor = 'silver';
         document.getElementById('linkAs').style.backgroundColor = 'white';
+        document.getElementById('linkSioc').style.backgroundColor = 'white';
+        
         document.getElementById('formPingback').style.display = 'block';
+        
         document.getElementById('formAs').style.display = 'none';
+        document.getElementById('formSioc').style.display = 'none';
       });
       document.getElementById('linkAs').addEventListener('click', function(){
         this.style.backgroundColor = 'silver';
         document.getElementById('linkPingback').style.backgroundColor = 'white';
+        document.getElementById('linkSioc').style.backgroundColor = 'white';
+        
         document.getElementById('formAs').style.display = 'block';
+        
         document.getElementById('formPingback').style.display = 'none';
+        document.getElementById('formSioc').style.display = 'none';
+      });
+      document.getElementById('linkSioc').addEventListener('click', function(){
+        
+        this.style.backgroundColor = 'silver';
+        document.getElementById('linkPingback').style.backgroundColor = 'white';
+        document.getElementById('linkAs').style.backgroundColor = 'white';
+        
+        document.getElementById('formSioc').style.display = 'block';
+        
+        document.getElementById('formPingback').style.display = 'none';
+        document.getElementById('formAs').style.display = 'none';
       });
     </script>
   </body>
