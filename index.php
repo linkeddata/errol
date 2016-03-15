@@ -51,7 +51,6 @@ function make_notification_as($post){
     $graph->add($notif, 'as:object', $graph->resource($post['source']));
     if($post['object'] != ""){
       $graph->add($notif, 'as:target', $graph->resource($post['object']));
-      $graph->add($notif, 'as:object', $graph->resource($post['object']));
     }
     if($post['inReplyTo'] != ""){
       $graph->add($notif, 'as:target', $graph->resource($post['inReplyTo']));
