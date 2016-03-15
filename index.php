@@ -28,6 +28,8 @@ function get_inbox($url){
   try{
     $graph->parse($data, $ct, $url);
   } catch (Exception $e) {
+    var_dump($data);
+    var_dump($e);
     return $e->getMessage();
   }
   
@@ -141,11 +143,11 @@ if(isset($_POST)){
     
   }
   
-  if(isset($_POST['to'])){
+  if($_POST['to'] != ""){
     $to = $_POST['to'];
-  }elseif(isset($_POST['object'])){
+  }elseif($_POST['object'] != ""){
     $to = $_POST['object'];
-  }elseif(isset($_POST['inReplyTo'])){
+  }elseif($_POST['inReplyTo'] != ""){
     $to = $_POST['inReplyTo'];
   }
   if(isset($to)){
