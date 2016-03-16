@@ -215,8 +215,8 @@ if(isset($_POST) && count($_POST) > 0){
       header { width: 60%; margin-right: auto; margin-left: auto; font-family: serif; font-size: 1.6em; color: gray; text-align: center;  }
       h1 { margin: 0; font-size: 2.4em; }
       nav { width: 60%; margin-right: auto; margin-left: auto; font-size: 1em; clear: both; overflow: hidden; }
-      nav ul { list-style-type: none; padding: 0; margin: 0; }
-      nav li { float: left; }
+      nav ul, footer ul { list-style-type: none; padding: 0; margin: 0; }
+      nav li, footer li { float: left; }
       nav li a { display: inline-block; padding: 0.2em; text-decoration: none; color: black; border: 1px solid silver; }
       nav li a:hover { text-decoration: none; background-color: silver; }
       form { width: 60%; margin-right: auto; margin-left: auto; border-top: 1px solid silver; }
@@ -227,6 +227,8 @@ if(isset($_POST) && count($_POST) > 0){
       input[type="submit"] { background-color: silver; padding: 0.6em; }
       div { width: 60%; margin-left: auto; margin-right: auto; }
       pre { border: 1px solid silver; }
+      footer { width: 60%; margin-left: auto; margin-right: auto; }
+      footer li a { display: inline-block; padding: 0.4em; text-decoration: none; border-left: 1px solid silver; }
     </style>
   </head>
   <body>
@@ -303,6 +305,15 @@ if(isset($_POST) && count($_POST) > 0){
       <?=isset($errors['sioc']) ? '</div>' : ""?>
         <p><input type="submit" id="sendSioc" name="sendSioc" value="Send" /></p>
     </form>
+    
+    <footer>
+      <ul>
+        <li><a href="https://github.com/linkeddata/errol">Source</a></li>
+        <li><a href="https://github.com/linkeddata/errol/issues">Issues</a></li>
+        <li><a href="https://github.com/solid">Solid</a></li>
+        <li><a href="https://github.com/solid/solid-spec#notifications">Solid Notifications</a></li>
+      </ul>
+    </footer>
     
     <script>
       if(window.location.hash == "#formPingback"){
