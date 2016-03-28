@@ -40,7 +40,7 @@ function get_inbox($url){
 function make_notification_as($post){
   
   $graph = new EasyRdf_Graph();
-  EasyRdf_Namespace::set('as', 'http://w3.org/ns/activitystreams#');
+  EasyRdf_Namespace::set('as', 'http://www.w3.org/ns/activitystreams#');
   
   $notif = $graph->resource('placeholder', 'solid:Notification');
   
@@ -94,7 +94,7 @@ function make_notification_pingback($post){
   $notif = $graph->resource('placeholder', 'solid:Notification');
   $graph->add($notif, 'rdf:type', $graph->resource('pingback:Request'));
   $graph->add($notif, 'pingback:source', $graph->resource($post['source']));
-  $graph->add($notif, 'pingback:target', $graph->resource($post['object']));
+  $graph->add($notif, 'pingback:target', $graph->resource($post['target']));
   
   $date = EasyRdf_Literal::create(date(DATE_ATOM), null, 'xsd:dateTime');
   $graph->add($notif, 'dct:created', $date);
@@ -112,7 +112,7 @@ function make_notification_sioc($post){
   $notif = $graph->resource('placeholder', 'solid:Notification');
   $graph->add($notif, 'rdf:type', $graph->resource('sioc:Post'));
   if($post['title'] != ""){
-    $graph->addLiteral($notif, 'sioc:title', $post['title']);
+    $graph->addLiteral($notif, 'dct:title', $post['title']);
   }
   if($post['content'] != ""){
     $graph->addLiteral($notif, 'sioc:content', $post['content']);
@@ -145,91 +145,107 @@ function write_notification($inbox, $turtle){
   return $result;
 }
 
-if(isset($_POST) && count($_POST) > 0){
+function make_notification($post){
+  
+  $notification = "";
   $errors = array();
-  
-  if(isset($_POST['sendAs'])){
+
+  if(isset($post) && count($post) > 0){
     
-    if($_POST['to'] == "" && $_POST['inReplyTo'] == "" && $_POST['object'] == ""){
-      $errors['to'] = "Must include one or more of to or in reply to or about.";
-    }
-    if($_POST['source'] == "" && $_POST['content'] == ""){
-      $errors['source'] = "Must include source and/or content.";
-    }
-    if(count($errors) < 1){
-      $notification = make_notification_as($_POST);
-    }
-  
-  }elseif(isset($_POST['sendPingback'])){
+    if(isset($post['sendAs'])){
+      
+      if($post['to'] == "" && $post['inReplyTo'] == "" && $post['object'] == ""){
+        $errors['to'] = "Must include one or more of to or in reply to or about.";
+      }
+      if($post['source'] == "" && $post['content'] == ""){
+        $errors['source'] = "Must include source and/or content.";
+      }
+      if(count($errors) < 1){
+        $notification = make_notification_as($post);
+      }
     
-    if($_POST['source'] == "" || $_POST['object'] == ""){
-      $errors['pingback'] = "Must include source and target.";
+    }elseif(isset($post['sendPingback'])){
+      
+      if($post['source'] == "" || $post['target'] == ""){
+        $errors['pingback'] = "Must include source and target.";
+      }
+      if(count($errors) < 1){
+        $notification = make_notification_pingback($post);
+      }
+      
+    }elseif(isset($post['sendSioc'])){
+      
+      if($post['to'] == ""){
+        $errors['to'] = "Must include to.";
+      }
+      
+      if($post['title'] == "" && $post['content'] == ""){
+        $errors['sioc'] = "Must include title or content.";
+      }
+      if(count($errors) < 1){
+        $notification = make_notification_sioc($post);
+      }
+      
     }
-    if(count($errors) < 1){
-      $notification = make_notification_pingback($_POST);
-    }
-    
-  }elseif(isset($_POST['sendSioc'])){
-    
-    if($_POST['to'] == ""){
-      $errors['to'] = "Must include to.";
-    }
-    
-    if($_POST['title'] == "" && $_POST['content'] == ""){
-      $errors['sioc'] = "Must include title or content.";
-    }
-    if(count($errors) < 1){
-      $notification = make_notification_sioc($_POST);
-    }
-    
   }
+    
+    return array("notification"=>$notification, "errors"=>$errors);
+}
+
+function route($post){
   
-  if($_POST['to'] != ""){
-    $to = $_POST['to'];
-  }elseif($_POST['object'] != ""){
-    $to = $_POST['object'];
-  }elseif($_POST['inReplyTo'] != ""){
-    $to = $_POST['inReplyTo'];
+  $inbox = "";
+  $errors = array();
+  if(isset($post['to']) && $post['to'] != ""){
+    $to = $post['to'];
+  }elseif(isset($post['object']) && $post['object'] != ""){
+    $to = $post['object'];
+  }elseif(isset($post['target']) && $post['target'] != ""){
+    $to = $post['target'];
+  }elseif(isset($post['inReplyTo']) && $post['inReplyTo'] != ""){
+    $to = $post['inReplyTo'];
   }
   if(isset($to)){
     $inbox = get_inbox($to);
     if(!isset($inbox)){
       $errors['inbox'] = "No inbox found for $to :(";
-    }elseif(isset($notification)){
-      if(write_notification($inbox, $notification)){
-        $success = "Posted!";
-      }
-    }else{
-      echo "no notification";
     }
+  }else{
+    $errors['inbox'] = "Nowhere to look for an inbox (need to, object, target or inReplyTo).";
   }
-    
+  return array("inbox"=>$inbox, "errors"=>$errors);
 }
+
+$prefill = array();
+if(isset($_GET) && count($_GET) > 0){
+  $prefill = $_GET;
+}
+
+if($_SERVER['REQUEST_METHOD'] == "POST" && count($_POST) > 0){
+  
+  $prefill = $_POST;
+  $route = route($_POST);
+  $notif = make_notification($_POST);
+  
+  if(count($route['errors']) < 1 && count($notif['errors']) < 1){
+    $write = write_notification($route['inbox'], $notif['notification']);
+    if($write){
+      $success = "Posted!";
+      $inbox = $route['inbox'];
+    }else{
+      $errors['write'] = "Notification not posted.";
+    }
+  }else{
+    $errors = array_merge($route['errors'], $notif['errors']);
+  }
+}
+
 ?>
 <!doctype html>
 <html>
   <head>
     <title>Errol</title>
-    <style type="text/css">
-      body { font-family: Arial, sans-serif; }
-      header { width: 60%; margin-right: auto; margin-left: auto; font-family: serif; font-size: 1.6em; color: gray; text-align: center;  }
-      h1 { margin: 0; font-size: 2.4em; }
-      nav { width: 60%; margin-right: auto; margin-left: auto; font-size: 1em; clear: both; overflow: hidden; }
-      nav ul, footer ul { list-style-type: none; padding: 0; margin: 0; }
-      nav li, footer li { float: left; }
-      nav li a { display: inline-block; padding: 0.2em; text-decoration: none; color: black; border: 1px solid silver; }
-      nav li a:hover { text-decoration: none; background-color: silver; }
-      form { width: 60%; margin-right: auto; margin-left: auto; border-top: 1px solid silver; }
-      form label { display: inline-block; }
-      form input, form textarea { width: 100%; padding: 0.4em; background-color: white; border: 1px solid silver; }
-      .error { font-weight: bold; color: red; }
-      .success { font-weight: bold; color: green; }
-      input[type="submit"] { background-color: silver; padding: 0.6em; }
-      div { width: 60%; margin-left: auto; margin-right: auto; }
-      pre { border: 1px solid silver; }
-      footer { width: 60%; margin-left: auto; margin-right: auto; }
-      footer li a { display: inline-block; padding: 0.4em; text-decoration: none; border-left: 1px solid silver; }
-    </style>
+    <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <header>
@@ -255,6 +271,11 @@ if(isset($_POST) && count($_POST) > 0){
         <p><strong>Parsing error</strong>: <?=$errors['parsing']?></p>
       </div>
     <?endif?>
+    <?if(isset($errors['write'])):?>
+      <div class="error">
+        <p><strong>Writing error</strong>: <?=$errors['write']?></p>
+      </div>
+    <?endif?>
     <?if(isset($success)):?>
       <div class="success">
         <p><?=$success?></p>
@@ -271,15 +292,15 @@ if(isset($_POST) && count($_POST) > 0){
       <h2>ActivityStreams2</h2>
       <p>All fields are optional, but you must include either <em>to</em> (person) or <em>in reply to</em> or <em>object</em> (resource), and you must include either <em>content</em> or a <em>source</em>.</p>
       <?=isset($errors['to']) ? '<div class="error"><p>'.$errors['to'].'</p>' : ""?>
-        <p><label for="to">To</label> <input name="to" type="url" placeholder="WebID of a person" value="<?=isset($_POST['to']) ? $_POST['to'] : ''?>"/></p>
-        <p><label for="inReplyTo">In reply to</label> <input name="inReplyTo" type="url" placeholder="URI of a resource that this notification is in reply to" value="<?=isset($_POST['inReplyTo']) ? $_POST['inReplyTo'] : ''?>" /></p>
-        <p><label for="object">Object</label> <input name="object" type="url" placeholder="URI of a resource that this notification is about (but not a reply)" value="<?=isset($_POST['object']) ? $_POST['object'] : ''?>" /></p>
+        <p><label for="to">To</label> <input name="to" type="url" placeholder="WebID of a person" value="<?=isset($prefill['to']) ? $prefill['to'] : ''?>"/></p>
+        <p><label for="inReplyTo">In reply to</label> <input name="inReplyTo" type="url" placeholder="URI of a resource that this notification is in reply to" value="<?=isset($prefill['inReplyTo']) ? $prefill['inReplyTo'] : ''?>" /></p>
+        <p><label for="object">Object</label> <input name="object" type="url" placeholder="URI of a resource that this notification is about (but not a reply)" value="<?=isset($prefill['object']) ? $prefill['object'] : ''?>" /></p>
       <?=isset($errors['to']) ? '</div>' : ""?>
       <?=isset($errors['source']) ? '<div class="error"><p>'.$errors['source'].'</p>' : ""?>
-        <p><label for="source">Source</label> <input name="source" type="url" placeholder="URI of a resource with additional relevent information" value="<?=isset($_POST['source']) ? $_POST['source'] : ''?>" /></p>
-        <p><label>Content</label> <textarea name="content"><?=isset($_POST['content']) ? $_POST['content'] : ''?></textarea></p>
+        <p><label for="source">Source</label> <input name="source" type="url" placeholder="URI of a resource with additional relevent information" value="<?=isset($prefill['source']) ? $prefill['source'] : ''?>" /></p>
+        <p><label>Content</label> <textarea name="content"><?=isset($prefill['content']) ? $prefill['content'] : ''?></textarea></p>
       <?=isset($errors['source']) ? '</div>' : ""?>
-      <p><label>Your URI</label> <input name="actor" type="url" value="<?=isset($_POST['actor']) ? $_POST['actor'] : ''?>" /></p>
+      <p><label>Your URI</label> <input name="actor" type="url" value="<?=isset($prefill['actor']) ? $prefill['actor'] : ''?>" /></p>
       <p><input type="submit" id="sendAs" name="sendAs" value="Send" /></p>
     </form>
     
@@ -287,8 +308,8 @@ if(isset($_POST) && count($_POST) > 0){
       <h2>Pingback</h2>
       <p><em>Source</em> and <em>target</em> are required.</p>
       <?=isset($errors['pingback']) ? '<div class="error"><p>'.$errors['pingback'].'</p>' : ""?>
-        <p><label>Source</label> <input name="source" type="url" placeholder="Where this notification is coming from" value="<?=isset($_POST['source']) ? $_POST['source'] : ''?>" /></p>
-        <p><label>Target</label> <input name="object" type="url" placeholder="Where this notification is pointing to" value="<?=isset($_POST['object']) ? $_POST['object'] : ''?>" /></p>
+        <p><label>Source</label> <input name="source" type="url" placeholder="Where this notification is coming from" value="<?=isset($prefill['source']) ? $prefill['source'] : ''?>" /></p>
+        <p><label>Target</label> <input name="target" type="url" placeholder="Where this notification is pointing to" value="<?=isset($prefill['target']) ? $prefill['target'] : ''?>" /></p>
         <p><input type="submit" id="sendPingback" name="sendPingback" value="Send" /></p>
     </form>
     
@@ -296,12 +317,12 @@ if(isset($_POST) && count($_POST) > 0){
       <h2>Sioc</h2>
       <p><em>To</em> is required and one of <em>title</em> and <em>content</em> is required.</p>
       <?=isset($errors['to']) ? '<div class="error"><p>'.$errors['to'].'</p>' : ""?>
-        <p><label>To</label> <input name="to" type="url" placeholder="WebID of receiver" value="<?=isset($_POST['to']) ? $_POST['to'] : ''?>" /></p>
+        <p><label>To</label> <input name="to" type="url" placeholder="WebID of receiver" value="<?=isset($prefill['to']) ? $prefill['to'] : ''?>" /></p>
       <?=isset($errors['to']) ? '</div>' : ""?>
-      <p><label>From</label> <input name="creator" type="url" placeholder="WebID of author of message" value="<?=isset($_POST['creator']) ? $_POST['creator'] : ''?>" /></p>
+      <p><label>From</label> <input name="creator" type="url" placeholder="WebID of author of message" value="<?=isset($prefill['creator']) ? $prefill['creator'] : ''?>" /></p>
       <?=isset($errors['sioc']) ? '<div class="error"><p>'.$errors['sioc'].'</p>' : ""?>
-        <p><label>Title</label> <input name="title" type="text" placeholder="Name for this message" value="<?=isset($_POST['title']) ? $_POST['title'] : ''?>" /></p>
-        <p><label>Content</label> <textarea name="content"><?=isset($_POST['content']) ? $_POST['content'] : ''?></textarea></p>
+        <p><label>Title</label> <input name="title" type="text" placeholder="Name for this message" value="<?=isset($prefill['title']) ? $prefill['title'] : ''?>" /></p>
+        <p><label>Content</label> <textarea name="content"><?=isset($prefill['content']) ? $prefill['content'] : ''?></textarea></p>
       <?=isset($errors['sioc']) ? '</div>' : ""?>
         <p><input type="submit" id="sendSioc" name="sendSioc" value="Send" /></p>
     </form>
