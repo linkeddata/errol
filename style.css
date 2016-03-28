@@ -1,0 +1,19 @@
+body { font-family: Arial, sans-serif; }
+header { width: 60%; margin-right: auto; margin-left: auto; font-family: serif; font-size: 1.6em; color: gray; text-align: center;  }
+h1 { margin: 0; font-size: 2.4em; }
+nav { width: 60%; margin-right: auto; margin-left: auto; font-size: 1em; clear: both; overflow: hidden; }
+nav ul, footer ul { list-style-type: none; padding: 0; margin: 0; }
+nav li, footer li { float: left; }
+nav li a { display: inline-block; padding: 0.2em; text-decoration: none; color: black; border: 1px solid silver; }
+nav li a:hover { text-decoration: none; background-color: silver; }
+form { width: 60%; margin-right: auto; margin-left: auto; border-top: 1px solid silver; }
+form label { display: inline-block; }
+form input, form textarea { width: 100%; padding: 0.4em; background-color: white; border: 1px solid silver; }
+.error { font-weight: bold; color: red; }
+.success { font-weight: bold; color: green; }
+input[type="submit"] { background-color: silver; padding: 0.6em; }
+div { width: 60%; margin-left: auto; margin-right: auto; }
+pre { border: 1px solid silver; }
+footer { width: 60%; margin-left: auto; margin-right: auto; }
+footer li a { display: inline-block; padding: 0.4em; text-decoration: none; border-left: 1px solid silver; }
+hr { border: 1px solid silver; }

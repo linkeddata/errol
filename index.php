@@ -128,6 +128,17 @@ function make_notification_sioc($post){
   
 }
 
+function make_notification_triple($post){
+  
+  $graph = new EasyRdf_Graph();
+  $subj = $graph->resource($post['subject']);
+  $pred = $graph->resource($post['predicate']);
+  $obj = $graph->resource($post['object']);
+  $graph->add($subj, $pred, $obj);
+  return $graph->serialise('turtle');
+  
+}
+
 function write_notification($inbox, $turtle){
   
   $turtle = str_replace('placeholder', '', $turtle);
@@ -186,6 +197,15 @@ function make_notification($post){
         $notification = make_notification_sioc($post);
       }
       
+    }elseif(isset($post['sendTriple'])){
+      
+      if($post['subject'] == "" || $post['predicate'] == "" || $post['object'] == ""){
+        $errors['triple'] = "Subject, predicate and object are required.";
+      }
+      if(count($errors) < 1){
+        $notification = make_notification_triple($post);
+      }
+      
     }
   }
     
@@ -220,7 +240,6 @@ $prefill = array();
 if(isset($_GET) && count($_GET) > 0){
   $prefill = $_GET;
 }
-
 if($_SERVER['REQUEST_METHOD'] == "POST" && count($_POST) > 0){
   
   $prefill = $_POST;
@@ -237,6 +256,7 @@ if($_SERVER['REQUEST_METHOD'] == "POST" && count($_POST) > 0){
     }
   }else{
     $errors = array_merge($route['errors'], $notif['errors']);
+    //var_dump($errors);
   }
 }
 
@@ -281,11 +301,12 @@ if($_SERVER['REQUEST_METHOD'] == "POST" && count($_POST) > 0){
         <p><?=$success?></p>
       </div>
     <?endif?>
-    <nav>
+    <nav id="links">
       <ul>
-        <li><a href="#formAs" id="linkAs">ActivityStreams2</a></li>
-        <li><a href="#formPingback" id="linkPingback">Pingback</a></li>
-        <li><a href="#formSioc" id="linkSioc">Sioc</a></li>
+        <li><a href="#As" id="linkAs">ActivityStreams2</a></li>
+        <li><a href="#Pingback" id="linkPingback">Pingback</a></li>
+        <li><a href="#Sioc" id="linkSioc">Sioc</a></li>
+        <li><a href="#Triple" id="linkTriple">Triple</a></li>
       </ul>
     </nav>
     <form method="post" id="formAs">
@@ -327,6 +348,17 @@ if($_SERVER['REQUEST_METHOD'] == "POST" && count($_POST) > 0){
         <p><input type="submit" id="sendSioc" name="sendSioc" value="Send" /></p>
     </form>
     
+    <form method="post" id="formTriple">
+      <h2>Triple</h2>
+      <p>All fields required. Sends a single triple statement.</p>
+      <?=isset($errors['triple']) ? '<div class="error"><p>'.$errors['triple'].'</p>' : ''?>
+        <p><label>Subject</label> <input name="subject" type="url" placeholder="Subject of this notification" value="<?=isset($prefill['subject']) ? $prefill['subject'] : ''?>" /></p>
+        <p><label>Predicate</label> <input name="predicate" type="url" placeholder="Relation between subject and object (full uri including namespace)" value="<?=isset($prefill['predicate']) ? $prefill['predicate'] : ''?>" /></p>
+        <p><label>Object</label> <input name="object" type="url" placeholder="Object of this notification" value="<?=isset($prefill['object']) ? $prefill['object'] : ''?>" /></p>
+      <?=isset($errors['triple']) ? '</div>' : ''?>
+      <p><input type="submit" id="sendTriple" name="sendTriple" value="Send" /></p>
+    </form>
+    
     <footer>
       <ul>
         <li><a href="https://github.com/linkeddata/errol">Source</a></li>
@@ -337,50 +369,37 @@ if($_SERVER['REQUEST_METHOD'] == "POST" && count($_POST) > 0){
     </footer>
     
     <script>
-      if(window.location.hash == "#formPingback"){
-        document.getElementById('formAs').style.display = 'none';
-        document.getElementById('formSioc').style.display = 'none';
-        document.getElementById('linkPingback').style.backgroundColor = 'silver';
-      }else if(window.location.hash == "#formSioc"){
-        document.getElementById('formAs').style.display = 'none';
-        document.getElementById('formPingback').style.display = 'none';
-        document.getElementById('linkSioc').style.backgroundColor = 'silver';
-      }else{
-        document.getElementById('formPingback').style.display = 'none';
-        document.getElementById('formSioc').style.display = 'none';
-        document.getElementById('linkAs').style.backgroundColor = 'silver';
+      
+      function toggle(name){
+        
+        var nav = document.getElementById('links');
+        var links = nav.querySelectorAll('a');
+        var forms = document.querySelectorAll('form');
+        for(var i = 0; i < forms.length; i++){
+          forms[i].style.display = 'none';
+        }
+        for(var i = 0; i < links.length; i++){
+          links[i].style.backgroundColor = 'white';
+        }
+        document.getElementById('form'+name).style.display = 'block';
+        document.getElementById('link'+name).style.backgroundColor = 'silver';
+        
       }
-      document.getElementById('linkPingback').addEventListener('click', function(){
-        this.style.backgroundColor = 'silver';
-        document.getElementById('linkAs').style.backgroundColor = 'white';
-        document.getElementById('linkSioc').style.backgroundColor = 'white';
-        
-        document.getElementById('formPingback').style.display = 'block';
-        
-        document.getElementById('formAs').style.display = 'none';
-        document.getElementById('formSioc').style.display = 'none';
-      });
-      document.getElementById('linkAs').addEventListener('click', function(){
-        this.style.backgroundColor = 'silver';
-        document.getElementById('linkPingback').style.backgroundColor = 'white';
-        document.getElementById('linkSioc').style.backgroundColor = 'white';
-        
-        document.getElementById('formAs').style.display = 'block';
-        
-        document.getElementById('formPingback').style.display = 'none';
-        document.getElementById('formSioc').style.display = 'none';
-      });
-      document.getElementById('linkSioc').addEventListener('click', function(){
-        
-        this.style.backgroundColor = 'silver';
-        document.getElementById('linkPingback').style.backgroundColor = 'white';
-        document.getElementById('linkAs').style.backgroundColor = 'white';
-        
-        document.getElementById('formSioc').style.display = 'block';
-        
-        document.getElementById('formPingback').style.display = 'none';
-        document.getElementById('formAs').style.display = 'none';
-      });
+      
+      if(window.location.hash != ""){
+        toggle(window.location.hash.substring(1));
+      }else{
+        toggle('As');
+      }
+      
+      var nav = document.getElementById('links');
+      var links = nav.querySelectorAll('a');
+      for(var i = 0; i < links.length; i++){
+        links[i].addEventListener('click', function(){
+          toggle(this.hash.substring(1));
+        });
+      }
+      
     </script>
   </body>
 </html>
