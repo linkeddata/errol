@@ -169,8 +169,9 @@ function write_notification($inbox, $turtle){
     'Content-Length: ' . strlen($turtle))
   );
   $result = curl_exec($ch);
+  $info = curl_getinfo($ch);
   curl_close($ch);
-  return $result;
+  return $info['http_code'];
 }
 
 function make_notification($post){
@@ -265,11 +266,11 @@ if($_SERVER['REQUEST_METHOD'] == "POST" && count($_POST) > 0){
   
   if(count($route['errors']) < 1 && count($notif['errors']) < 1){
     $write = write_notification($route['inbox'], $notif['notification']);
-    if($write){
+    if($write >= 200 && $write < 300){
       $success = "Posted!";
       $inbox = $route['inbox'];
     }else{
-      $errors['write'] = "Notification not posted.";
+      $errors['write'] = "Notification not posted ($write).";
     }
   }else{
     $errors = array_merge($route['errors'], $notif['errors']);
