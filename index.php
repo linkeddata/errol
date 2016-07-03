@@ -2,38 +2,55 @@
 require_once('init.php');
 
 EasyRdf_Namespace::set('solid', 'http://www.w3.org/ns/solid/terms#');
+EasyRdf_Namespace::set('ldp', 'http://www.w3.org/ns/ldp#');
+
+function inbox_from_header($url, $rel="http://www.w3.org/ns/ldp#inbox"){
+  if(isset($_SESSION[$rel])){
+    return $_SESSION[$rel];
+  }else{
+    $res = head_http_rels($url);
+    $rels = $res['rels'];
+    var_dump($res);
+    return $rels[$rel][0];
+  }
+}
 
 function get_inbox($url){
-  $ch = curl_init();
-	curl_setopt($ch, CURLOPT_URL, $url);
-	curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-	$data = curl_exec($ch);
-	$ct = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-	curl_close($ch);
-	
-	$cts = explode(';', $ct);
-	if(count($cts) > 1){
-  	foreach($cts as $act){
-  	  $act = trim($act);
-    	try {
-    	  if(EasyRdf_Format::getFormat($act)){
-    	    $ct = $act;
-    	    break;
-    	  }
-    	}catch(Exception $e){}
-  	}
-	}
-	$graph = new EasyRdf_Graph();
-	
-  try{
-    $graph->parse($data, $ct, $url);
-  } catch (Exception $e) {
-    return $e->getMessage();
-  }
-  
-  $subject = $graph->resource($url);
-	$inbox = $subject->get('solid:inbox');
 
+  $inbox = inbox_from_header($url);
+  if(empty($inbox)){
+
+    $ch = curl_init();
+  	curl_setopt($ch, CURLOPT_URL, $url);
+  	curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+  	$data = curl_exec($ch);
+  	$ct = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+  	curl_close($ch);
+  	
+  	$cts = explode(';', $ct);
+  	if(count($cts) > 1){
+    	foreach($cts as $act){
+    	  $act = trim($act);
+      	try {
+      	  if(EasyRdf_Format::getFormat($act)){
+      	    $ct = $act;
+      	    break;
+      	  }
+      	}catch(Exception $e){}
+    	}
+  	}
+  	$graph = new EasyRdf_Graph();
+  	
+    try{
+      $graph->parse($data, $ct, $url);
+    } catch (Exception $e) {
+      return $e->getMessage();
+    }
+    
+    $subject = $graph->resource($url);
+  	$inbox = $subject->get('solid:inbox');
+
+  }
 	return $inbox;
 }
 
@@ -271,7 +288,7 @@ if($_SERVER['REQUEST_METHOD'] == "POST" && count($_POST) > 0){
     <header>
       <img src="owl.jpg" width="100" />
       <h1>Errol</h1>
-      <p>Send Solid Notifications to any inbox.</p>
+      <p>Send Linked Data Notifications to any inbox.</p>
     </header>
     <div>
       <?if(isset($inbox)):?>
