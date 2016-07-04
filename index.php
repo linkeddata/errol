@@ -10,7 +10,6 @@ function inbox_from_header($url, $rel="http://www.w3.org/ns/ldp#inbox"){
   }else{
     $res = head_http_rels($url);
     $rels = $res['rels'];
-    var_dump($res);
     return $rels[$rel][0];
   }
 }
@@ -99,8 +98,11 @@ function make_notification_as($post){
   $date = EasyRdf_Literal::create(date(DATE_ATOM), null, 'xsd:dateTime');
   $graph->add($notif, 'as:published', $date);
   
-  $normed = $graph->serialise('turtle');
-  return $normed;
+  // TODO: Ask receiver if it can take turtle
+  $normed = $graph->serialise('application/ld+json');
+  $cmp = \ML\JsonLD\JsonLD::compact($normed, "https://www.w3.org/ns/activitystreams");
+  $str = \ML\JsonLD\JsonLD::toString($cmp, true);
+  return $str;
 }
 
 function make_notification_pingback($post){
@@ -116,8 +118,10 @@ function make_notification_pingback($post){
   $date = EasyRdf_Literal::create(date(DATE_ATOM), null, 'xsd:dateTime');
   $graph->add($notif, 'dct:created', $date);
   
-  $normed = $graph->serialise('turtle');
-  return $normed;
+  $normed = $graph->serialise('application/ld+json');
+  $cmp = \ML\JsonLD\JsonLD::compact($normed, "http://purl.org/net/pingback/");
+  $str = \ML\JsonLD\JsonLD::toString($cmp, true);
+  return $str;
 }
 
 function make_notification_sioc($post){
@@ -140,8 +144,10 @@ function make_notification_sioc($post){
   $date = EasyRdf_Literal::create(date(DATE_ATOM), null, 'xsd:dateTime');
   $graph->add($notif, 'dct:created', $date);
   
-  $normed = $graph->serialise('turtle');
-  return $normed;
+  $normed = $graph->serialise('application/ld+json');
+  $cmp = \ML\JsonLD\JsonLD::compact($normed, "http://rdfs.org/sioc/ns#");
+  $str = \ML\JsonLD\JsonLD::toString($cmp, true);
+  return $str;
   
 }
 
@@ -152,7 +158,11 @@ function make_notification_triple($post){
   $pred = $graph->resource($post['predicate']);
   $obj = $graph->resource($post['object']);
   $graph->add($subj, $pred, $obj);
-  return $graph->serialise('turtle');
+  
+  $normed = $graph->serialise('application/ld+json');
+  $cmp = \ML\JsonLD\JsonLD::compact($normed);
+  $str = \ML\JsonLD\JsonLD::toString($cmp, true);
+  return $str;
   
 }
 
@@ -165,7 +175,7 @@ function write_notification($inbox, $turtle){
   curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
   curl_setopt($ch, CURLOPT_POSTFIELDS, $turtle);
   curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-    'Content-Type: text/turtle',
+    'Content-Type: applicaton/ld+json',
     'Content-Length: ' . strlen($turtle))
   );
   $result = curl_exec($ch);
@@ -222,6 +232,7 @@ function make_notification($post){
       }
       if(count($errors) < 1){
         $notification = make_notification_triple($post);
+        var_dump($notification);
       }
       
     }
