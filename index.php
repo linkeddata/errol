@@ -393,7 +393,7 @@ if($_SERVER['REQUEST_METHOD'] == "POST" && count($_POST) > 0){
         <li><a href="https://github.com/linkeddata/errol">Source</a></li>
         <li><a href="https://github.com/linkeddata/errol/issues">Issues</a></li>
         <li><a href="https://github.com/solid">Solid</a></li>
-        <li><a href="https://github.com/solid/solid-spec#notifications">Solid Notifications</a></li>
+        <li><a href="https://rawgit.com/csarven/ldn/master/index.html">Linked Data Notifications</a></li>
       </ul>
     </footer>
     
